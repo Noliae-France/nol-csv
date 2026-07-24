@@ -1,0 +1,82 @@
+// nol.csv — encodage / décodage CSV (RFC 4180), en pur Nolc.
+//
+// Encodage complet et conforme (guillemets quand nécessaire, guillemets
+// internes doublés). Décodage d'une ligne SIMPLE (séparateur virgule, champs
+// non guillemetés) ; le décodage des champs guillemetés multi-lignes est au
+// programme d'une prochaine version — voir README.
+
+// Un champ doit-il être entouré de guillemets ? (contient , " ou saut de ligne)
+fn csv_champ_a_guillemeter(v: Text) -> Bool {
+    return contains(v, ",") or contains(v, "\"") or contains(v, "\n") or contains(v, "\r")
+}
+
+// Encode un champ : guillemets si nécessaire, guillemets internes doublés.
+fn csv_echappe(v: Text) -> Text {
+    if csv_champ_a_guillemeter(v) {
+        return "\"" + replace(v, "\"", "\"\"") + "\""
+    }
+    return v
+}
+
+// Encode une ligne (liste de champs) en CSV.
+fn csv_ligne(champs: List<Text>) -> Text {
+    var out = ""
+    var premier = true
+    for c in champs {
+        if not premier {
+            out = out + ","
+        }
+        out = out + csv_echappe(c)
+        premier = false
+    }
+    return out
+}
+
+// Encode plusieurs lignes (chaque élément est une liste de champs déjà rendue
+// en ligne CSV) séparées par « \r\n », terminaison RFC 4180.
+fn csv_document(lignes: List<Text>) -> Text {
+    var out = ""
+    for l in lignes {
+        out = out + l + "\r\n"
+    }
+    return out
+}
+
+// Décode une ligne CSV SIMPLE (champs non guillemetés) en liste de champs.
+fn csv_analyse_ligne_simple(ligne: Text) -> List<Text> {
+    return split(ligne, ",")
+}
+
+// ============================ TESTS ============================
+
+fn test_echappe_simple() {
+    assert(csv_echappe("bonjour") == "bonjour", "sans guillemets")
+    assert(csv_echappe("a,b") == "\"a,b\"", "virgule guillemetee")
+}
+
+fn test_echappe_guillemets() {
+    assert(csv_echappe("dit \"oui\"") == "\"dit \"\"oui\"\"\"", "guillemets doubles")
+}
+
+fn test_ligne() {
+    var champs: List<Text> = []
+    push(champs, "nom")
+    push(champs, "ville, pays")
+    push(champs, "note")
+    assert(csv_ligne(champs) == "nom,\"ville, pays\",note", "ligne mixte")
+}
+
+fn test_document() {
+    var l1: List<Text> = []
+    push(l1, "a")
+    push(l1, "b")
+    var lignes: List<Text> = []
+    push(lignes, csv_ligne(l1))
+    assert(csv_document(lignes) == "a,b\r\n", "document termine")
+}
+
+fn test_analyse_simple() {
+    let champs = csv_analyse_ligne_simple("x,y,z")
+    assert(len(champs) == 3, "trois champs")
+    assert(get(champs, 1) == "y", "deuxieme champ")
+}
